@@ -100,18 +100,18 @@ done
 echo ""
 log_info "--- Compile test ---"
 
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+_TMPDIR=$(mktemp -d)
+trap 'rm -rf "$_TMPDIR"' EXIT
 
-cat > "$TMPDIR/hello.c" << 'CSRC'
+cat > "$_TMPDIR/hello.c" << 'CSRC'
 int main(void) { return 0; }
 CSRC
 
 if "$TOOLS_DIR/bin/mips-harvard-os161-gcc" \
         -nostdinc -nostdlib \
-        -o "$TMPDIR/hello.o" -c "$TMPDIR/hello.c" 2>/dev/null; then
+        -o "$_TMPDIR/hello.o" -c "$_TMPDIR/hello.c" 2>/dev/null; then
     _pass "Cross-compiled hello.c → hello.o successfully"
-    arch=$(file "$TMPDIR/hello.o" 2>/dev/null)
+    arch=$(file "$_TMPDIR/hello.o" 2>/dev/null)
     if echo "$arch" | grep -q "MIPS"; then
         _pass "Output is MIPS object: $arch"
     else
@@ -121,16 +121,20 @@ else
     _fail "Cross-compilation failed"
 fi
 
-# ── 6. ~/.bashrc contains the os161 PATH line ────────────────────────────────
+# ── 6. rc file contains the os161 PATH line ───────────────────────────────────
 echo ""
 log_info "--- Checking permanent PATH config ---"
 
-BASHRC="$HOME/.bashrc"
-if [ -f "$BASHRC" ] && grep -q "os161/tools/bin" "$BASHRC"; then
-    _pass "os161 PATH entry found in $BASHRC"
-else
-    _fail "os161 PATH entry NOT found in $BASHRC — run setEnvPermanent.sh"
-fi
+RC_FILES=("$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile")
+_rc_found=0
+for _rc in "${RC_FILES[@]}"; do
+    if [ -f "$_rc" ] && grep -q "os161/tools/bin" "$_rc"; then
+        _pass "os161 PATH entry found in $_rc"
+        _rc_found=1
+        break
+    fi
+done
+[ "$_rc_found" -eq 1 ] || _fail "os161 PATH entry not found in any rc file (~/.bashrc, ~/.bash_profile, ~/.profile) — run setEnvPermanent.sh"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""

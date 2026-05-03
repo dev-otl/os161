@@ -5,23 +5,33 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 source "$SCRIPT_DIR/common.sh"
 
 mkdir -p "$TOOLBUILD_DIR" "$TOOLS_DIR/bin" "$LOG_DIR"
+
+# ── Pre-flight: verify fixedFiles are present before any build starts ─────────
+FIXED_FILES=(
+    "$SCRIPT_DIR/fixedFiles/reload1.c"
+    "$SCRIPT_DIR/fixedFiles/sim-arange.h"
+    "$SCRIPT_DIR/fixedFiles/onsel.h"
+    "$SCRIPT_DIR/fixedFiles/usemtest.c"
+)
+_missing_fixed=0
+for _f in "${FIXED_FILES[@]}"; do
+    if [ ! -f "$_f" ]; then
+        log_error "Missing required file: $_f"
+        _missing_fixed=1
+    fi
+done
+[ "$_missing_fixed" -eq 0 ] || die "fixedFiles are missing — is your repo checkout complete?"
+
 export PATH="$TOOLS_DIR/bin:$PATH"
 
 # ── Idempotency sentinels ─────────────────────────────────────────────────────
-# Each component is skipped if its primary output binary already exists.
-# To force a full rebuild, delete $OS161_DIR or the specific binary and re-run.
 _sentinel_binutils="$TOOLS_DIR/bin/mips-harvard-os161-as"
 _sentinel_gcc="$TOOLS_DIR/bin/mips-harvard-os161-gcc"
 _sentinel_gdb="$TOOLS_DIR/bin/mips-harvard-os161-gdb"
 _sentinel_sys161="$TOOLS_DIR/bin/sys161"
 _sentinel_src="$OS161_DIR/src/configure"
-# ─────────────────────────────────────────────────────────────────────────────
 
 # ── Build functions ───────────────────────────────────────────────────────────
-# Each function runs in a subshell (enforced by run_step/run_step_bg), so:
-#  - cd commands do not affect other builds or the parent shell
-#  - set -euo pipefail is active inside each subshell
-#  - all output is captured to the component's log file
 
 _build_binutils() {
     rm -rf "$TOOLBUILD_DIR"/binutils-*
@@ -43,12 +53,6 @@ _build_gcc() {
     cd "$TOOLBUILD_DIR/gcc-"*
     find . -name '*.info' | xargs -r touch
     find . -name '*.texi' | xargs -r touch
-    # Touch both .info AND .texi: Ubuntu 22's texinfo 6.8 treats @anchor inside
-    # @heading as a hard error (previously a warning). Touching .info prevents
-    # regeneration from source; touching .texi makes them appear newer than any
-    # intermediate files so make skips the doc targets.  MAKEINFO=true (below)
-    # is the final safety net — it replaces makeinfo with a no-op for the whole
-    # build so even targets that bypass the timestamp check cannot fail.
     touch intl/plural.c
     ./contrib/download_prerequisites
     cp "$SCRIPT_DIR/fixedFiles/reload1.c" ./gcc/reload1.c
@@ -77,9 +81,6 @@ _build_gdb() {
         --target=mips-harvard-os161 \
         --prefix="$TOOLS_DIR" \
         --with-python=no
-    # --with-python=no: GDB 7.8 uses the pre-3.10 _PyImport_FixupBuiltin API
-    # (2-arg form).  Python 3.10+ changed it to 3 args, which breaks the build.
-    # Python scripting in GDB is not needed for os161 cross-debugging.
     make $MAKE_FLAGS
     make install $MAKE_FLAGS
 }
@@ -104,16 +105,12 @@ _extract_os161_src() {
 
 # ── Build orchestration ───────────────────────────────────────────────────────
 
-# --- binutils (must be built before gcc and gdb) ---
 if [ -f "$_sentinel_binutils" ]; then
     log_ok "Skipping binutils — already built ($_sentinel_binutils exists)"
 else
     run_step "binutils" "$LOG_DIR/binutils.log" _build_binutils
 fi
 
-# --- gcc, gdb, sys161, os161-src run in parallel ---
-# gcc and gdb both need binutils headers/libraries (built above).
-# sys161 and os161-src extraction are fully independent.
 PARALLEL_FAILED=0
 GCC_PID="" GDB_PID="" SYS161_PID="" SRC_PID=""
 
@@ -146,8 +143,6 @@ else
     SRC_PID=$!
 fi
 
-# Collect results — wait for every job we actually started, report all failures
-# before aborting so the user sees everything that went wrong in one pass.
 [ -f "$_sentinel_gcc"    ] || { [ -n "$GCC_PID"    ] || die "GCC_PID unset — logic error"; wait_step "gcc"       "$GCC_PID"    "$LOG_DIR/gcc.log"; }
 [ -f "$_sentinel_gdb"    ] || { [ -n "$GDB_PID"    ] || die "GDB_PID unset — logic error"; wait_step "gdb"       "$GDB_PID"    "$LOG_DIR/gdb.log"; }
 [ -f "$_sentinel_sys161" ] || { [ -n "$SYS161_PID" ] || die "SYS161_PID unset — logic error"; wait_step "sys161"    "$SYS161_PID" "$LOG_DIR/sys161.log"; }
