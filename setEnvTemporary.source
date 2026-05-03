@@ -1,2 +1,20 @@
-OS161_BINPATH=$(realpath ../os161/tools/bin)    # path to newly built os161 binaries
-export PATH=\$PATH:$OS161_BINPATH
+# setEnvTemporary.source — source this file (do not execute) to add os161
+# tools to PATH in the current shell session only.
+#
+# Usage:  source ./setEnvTemporary.source
+#      or: . ./setEnvTemporary.source
+
+_SOURCED_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+OS161_BINPATH=$(realpath "$_SOURCED_DIR/../os161/tools/bin" 2>/dev/null) || {
+    echo "[ERROR] os161/tools/bin not found — has setupOS161.sh been run?" >&2
+    return 1
+}
+
+# Guard against adding the same path twice if re-sourced
+if [[ ":$PATH:" != *":$OS161_BINPATH:"* ]]; then
+    export PATH="$PATH:$OS161_BINPATH"
+    echo "[OK] Added to PATH: $OS161_BINPATH"
+else
+    echo "[OK] Already in PATH: $OS161_BINPATH"
+fi
+unset _SOURCED_DIR

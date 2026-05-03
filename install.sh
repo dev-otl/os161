@@ -1,20 +1,36 @@
 #!/bin/bash
+set -euo pipefail
 
-# runs available individual scripts sequentially
-# the os161 will be installed in ../os161
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+source "$SCRIPT_DIR/common.sh"
 
-                               
-# make all scripts executable and also obtain sudo permission
-sudo chmod +x *.sh      && \
-# update and upgrade system and also install necessary utilities 
-./preSetupOS161.sh      && \
-# Download necessary os161 tarballs if not already exists 
-./downloadTarballs.sh   && \
-# Install 
-./setupOS161.sh         && \
-# Build a DUMBVM kernel and run sys161 to check os161 installed correctly 
-./testBuild.sh          && \
-# Add ../os161/tools/bin to environment PATH variable 
-./setEnvPermanent.sh    && \
-echo "\nOS161 Installed successfully!"
+mkdir -p "$LOG_DIR"
+chmod +x "$SCRIPT_DIR"/*.sh
+
+_START=$(date +%s)
+log_info "=== os161 install started ==="
+log_info "Install root:    $OS161_DIR"
+log_info "Downloads:       $DOWNLOAD_DIR"
+log_info "Logs:            $LOG_DIR"
+log_info "Make parallelism: -j${MAKE_JOBS} per component (override: MAKE_JOBS=N)"
+printf '\n'
+
+"$SCRIPT_DIR/preSetupOS161.sh"
+printf '\n'
+"$SCRIPT_DIR/downloadTarballs.sh"
+printf '\n'
+"$SCRIPT_DIR/setupOS161.sh"
+printf '\n'
+"$SCRIPT_DIR/testBuild.sh"
+printf '\n'
+"$SCRIPT_DIR/setEnvPermanent.sh"
+printf '\n'
+
+_END=$(date +%s)
+_ELAPSED=$(( _END - _START ))
+log_ok "=== os161 installed successfully in ${_ELAPSED}s ==="
+log_info "Binaries: $TOOLS_DIR/bin"
+log_info "Source:   $OS161_DIR/src"
+log_warn "Logout/login required before PATH takes effect automatically."
+
 exit 0

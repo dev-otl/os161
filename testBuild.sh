@@ -1,49 +1,64 @@
-#! /bin/bash
-#set -xe
+#!/bin/bash
+set -euo pipefail
 
-SCRIPT_DIR=$(pwd .)
-OS161_DIR=$SCRIPT_DIR/../os161
-TOOLBUILD_DIR=$OS161_DIR/toolbuild
-TOOLS_DIR=$OS161_DIR/tools
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+source "$SCRIPT_DIR/common.sh"
 
-TESTBUILD_DIR=$SCRIPT_DIR/testbuild
-TEST_OSTREE=$TESTBUILD_DIR/root
-TEST_SRC_DIR=$TESTBUILD_DIR/src
+TESTBUILD_DIR="$SCRIPT_DIR/testbuild"
+TEST_OSTREE="$TESTBUILD_DIR/root"
+TEST_SRC_DIR="$TESTBUILD_DIR/src"
+KERNEL_BIN="$TEST_OSTREE/kernel"
+BMAKE_FLAGS="-j${MAKE_JOBS}"
 
-MAKE_FLAGS="-j"
-MAKE_INSTALL_FLAGS="-j"
+mkdir -p "$LOG_DIR"
+export PATH="$TOOLS_DIR/bin:$PATH"
 
-BMAKE_FLAGS="-j 4"
+# ── Idempotency ───────────────────────────────────────────────────────────────
+if [ -f "$KERNEL_BIN" ]; then
+    log_ok "Test kernel already built ($KERNEL_BIN) — skipping build"
+    log_info "Re-running sys161 boot test..."
+else
+    log_info "Test build directory: $TESTBUILD_DIR"
+    log_info "Logs: $LOG_DIR/testBuild-*.log"
 
+    _setup_src() {
+        rm -rf "$TESTBUILD_DIR"
+        mkdir -p "$TEST_OSTREE"
+        tar -xf "$(find_tarball 'os161-base-*.tar.gz')" -C "$TESTBUILD_DIR"
+        mv "$TESTBUILD_DIR"/os161-base-* "$TEST_SRC_DIR"
+        cp "$SCRIPT_DIR/fixedFiles/usemtest.c" \
+            "$TEST_SRC_DIR/userland/testbin/usemtest/usemtest.c"
+        cd "$TEST_SRC_DIR"
+        ./configure --ostree="$TEST_OSTREE"
+        bmake $BMAKE_FLAGS
+        bmake $BMAKE_FLAGS install
+    }
+    run_step "test: configure + userland" "$LOG_DIR/testBuild-userland.log" _setup_src
 
-## add to path might be optional or last step after script run
-export PATH=$OS161_DIR/tools/bin:$PATH
+    _build_kernel() {
+        cd "$TEST_SRC_DIR/kern/conf"
+        ./config DUMBVM
+        cd ../compile/DUMBVM
+        bmake $BMAKE_FLAGS depend
+        bmake $BMAKE_FLAGS
+        bmake $BMAKE_FLAGS install
+    }
+    run_step "test: DUMBVM kernel" "$LOG_DIR/testBuild-kernel.log" _build_kernel
 
-rm -rf $TESTBUILD_DIR
-mkdir -p $TEST_OSTREE
+    cp "$TOOLS_DIR/share/examples/sys161/sys161.conf.sample" "$TEST_OSTREE/sys161.conf"
 
-tar -xvf os161-* -C $TESTBUILD_DIR
-mv $TESTBUILD_DIR/os161-* $TESTBUILD_DIR/src 
-cp $SCRIPT_DIR/fixedFiles/usemtest.c $TEST_SRC_DIR/userland/testbin/usemtest/usemtest.c
+    _create_disks() {
+        cd "$TEST_OSTREE"
+        disk161 create LHD0.img 5M
+        disk161 create LHD1.img 5M
+    }
+    run_step "test: create disks" "$LOG_DIR/testBuild-disks.log" _create_disks
+fi
 
-cd $TEST_SRC_DIR
-./configure --ostree=$TEST_OSTREE
-bmake $BMAKE_FLAGS
-bmake $BMAKE_FLAGS install
-
-cd $TEST_SRC_DIR/kern/conf
-./config DUMBVM
-
-cd ../compile/DUMBVM
-bmake $BMAKE_FLAGS depend
-bmake $BMAKE_FLAGS
-bmake $BMAKE_FLAGS install 
-
-cp $TOOLS_DIR/share/examples/sys161/sys161.conf.sample $TEST_OSTREE/sys161.conf
-cd $TEST_OSTREE
-disk161 create LHD0.img 5M
-disk161 create LHD1.img 5M
+# Boot test — always run even if build was skipped, so a re-run re-verifies.
+log_info "Booting DUMBVM kernel with sys161 (should start and shut down cleanly)..."
+cd "$TEST_OSTREE"
 sys161 kernel 's;q'
+log_ok "sys161 boot test passed."
 
 exit 0
-
