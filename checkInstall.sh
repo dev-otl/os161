@@ -121,20 +121,15 @@ else
     _fail "Cross-compilation failed"
 fi
 
-# ── 6. /etc/profile.d/os161.sh is in place ───────────────────────────────────
+# ── 6. ~/.bashrc contains the os161 PATH line ────────────────────────────────
 echo ""
 log_info "--- Checking permanent PATH config ---"
 
-PROFILE="/etc/profile.d/os161.sh"
-if [ -f "$PROFILE" ]; then
-    _pass "$PROFILE exists"
-    if grep -q "$TOOLS_DIR/bin" "$PROFILE"; then
-        _pass "$PROFILE contains correct path"
-    else
-        _fail "$PROFILE does not contain $TOOLS_DIR/bin"
-    fi
+BASHRC="$HOME/.bashrc"
+if [ -f "$BASHRC" ] && grep -q "os161/tools/bin" "$BASHRC"; then
+    _pass "os161 PATH entry found in $BASHRC"
 else
-    _fail "$PROFILE missing — run setEnvPermanent.sh"
+    _fail "os161 PATH entry NOT found in $BASHRC — run setEnvPermanent.sh"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────

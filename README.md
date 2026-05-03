@@ -52,12 +52,7 @@ The install script follows following sequence of script execution. So you can ru
 
     chmod +x preSetupOS161.sh && ./preSetupOS161.sh
 
-which runs `sudo apt update && sudo apt full-upgrade -y && sudo apt install build-essential gdb libncurses-dev bmake -y`
-Goal is to have an up-to-date system with no dependency issues and following libraries installed in the system: 
-+ build-essential 
-+ gdb 
-+ libncurses-dev 
-+ bmake
+which runs `sudo apt-get update && sudo apt-get install build-essential gdb libncurses-dev bmake` — **only for packages that are not already installed**. It does not run `apt upgrade` or modify any existing packages.
 
 #### #skip script by manually installing: build-essential gdb libncurses-dev bmake 
 
