@@ -14,7 +14,7 @@ rm -rf "$OS161_DIR"
 # The marker is "# os161 toolchain"; the export line immediately follows it.
 BASHRC="$HOME/.bashrc"
 if grep -q "os161/tools/bin" "$BASHRC" 2>/dev/null; then
-    sed -i '/# os161 toolchain/,+1d' "$BASHRC"
+    sed -i '/^$/{N; /\n# os161 toolchain/{N; d}}' "$BASHRC"
     log_ok "Removed os161 PATH entry from $BASHRC"
 else
     log_info "No os161 PATH entry found in $BASHRC — nothing to remove"

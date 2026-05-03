@@ -120,6 +120,7 @@ GCC_PID="" GDB_PID="" SYS161_PID="" SRC_PID=""
 if [ -f "$_sentinel_gcc" ]; then
     log_ok "Skipping gcc    — already built"
 else
+    log_warn "gcc build will download GMP/MPFR/MPC via contrib/download_prerequisites — internet required"
     run_step_bg "gcc"       "$LOG_DIR/gcc.log"       _build_gcc
     GCC_PID=$!
 fi
