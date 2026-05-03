@@ -1,20 +1,24 @@
-# setEnvTemporary.source — source this file (do not execute) to add os161
-# tools to PATH in the current shell session only.
+# setEnvTemporary.source — adds os161 tools to PATH for the current shell only.
+# Does NOT require the toolchain to be installed at any specific path.
 #
 # Usage:  source ./setEnvTemporary.source
 #      or: . ./setEnvTemporary.source
 
 _SOURCED_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-OS161_BINPATH=$(realpath "$_SOURCED_DIR/../os161/tools/bin" 2>/dev/null) || {
-    echo "[ERROR] os161/tools/bin not found — has setupOS161.sh been run?" >&2
+_OS161_BIN="$(cd "$_SOURCED_DIR/.." && pwd)/os161/tools/bin"
+
+if [ ! -d "$_OS161_BIN" ]; then
+    echo "[ERROR] $_OS161_BIN not found — has setupOS161.sh been run?" >&2
+    unset _OS161_BIN
     return 1
-}
+fi
 
 # Guard against adding the same path twice if re-sourced
-if [[ ":$PATH:" != *":$OS161_BINPATH:"* ]]; then
-    export PATH="$PATH:$OS161_BINPATH"
-    echo "[OK] Added to PATH: $OS161_BINPATH"
+if [[ ":$PATH:" != *":$_OS161_BIN:"* ]]; then
+    export PATH="$PATH:$_OS161_BIN"
+    echo "[OK] Added to PATH: $_OS161_BIN"
 else
-    echo "[OK] Already in PATH: $OS161_BINPATH"
+    echo "[OK] Already in PATH: $_OS161_BIN"
 fi
-unset _SOURCED_DIR
+
+unset _OS161_BIN
