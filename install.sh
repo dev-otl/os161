@@ -21,6 +21,8 @@ printf '\n'
 printf '\n'
 "$SCRIPT_DIR/setupOS161.sh"
 printf '\n'
+"$SCRIPT_DIR/setupRoot.sh"
+printf '\n'
 "$SCRIPT_DIR/testBuild.sh"
 printf '\n'
 "$SCRIPT_DIR/setEnvPermanent.sh"
@@ -31,6 +33,7 @@ _ELAPSED=$(( _END - _START ))
 log_ok "=== os161 installed successfully in ${_ELAPSED}s ==="
 log_info "Binaries: $TOOLS_DIR/bin"
 log_info "Source:   $OS161_DIR/src"
+log_info "Root:     $OS161_DIR/root"
 log_warn "Logout/login required before PATH takes effect automatically."
 
 exit 0

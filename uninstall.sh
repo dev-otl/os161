@@ -5,22 +5,17 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 source "$SCRIPT_DIR/common.sh"
 
 log_info "Uninstalling os161..."
-log_info "  Removing: $OS161_DIR"
-log_info "  Removing: $SCRIPT_DIR/testbuild"
+log_info "  Removing: $OS161_DIR  (includes src/, root/, tools/, toolbuild/)"
 log_info "  Removing os161 PATH entry from rc files"
 
 rm -rf "$OS161_DIR"
-
-# Fix: remove testbuild/ which is created inside the repo by testBuild.sh
-# and is not under $OS161_DIR, so it must be removed separately.
-rm -rf "$SCRIPT_DIR/testbuild"
 
 # Remove the marker line and the PATH export line added by setEnvPermanent.sh.
 # Delete any line matching the marker comment OR the os161 PATH export,
 # regardless of surrounding blank lines — no positional assumptions.
 #
-# Fix: setEnvPermanent.sh writes to .bashrc AND .bash_profile/.profile,
-# so uninstall must clean all three — not only .bashrc.
+# setEnvPermanent.sh writes to .bashrc AND .bash_profile/.profile,
+# so uninstall must clean all three.
 _remove_from_rc() {
     local target="$1"
     [ -f "$target" ] || return 0

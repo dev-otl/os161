@@ -1,63 +1,41 @@
 #!/bin/bash
+# testBuild.sh — builds the DUMBVM kernel against the real os161 root directory
+# and verifies the toolchain by booting it under sys161.
+# Requires setupRoot.sh to have run first.
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 source "$SCRIPT_DIR/common.sh"
 
-TESTBUILD_DIR="$SCRIPT_DIR/testbuild"
-TEST_OSTREE="$TESTBUILD_DIR/root"
-TEST_SRC_DIR="$TESTBUILD_DIR/src"
-KERNEL_BIN="$TEST_OSTREE/kernel"
-BMAKE_FLAGS="-j${MAKE_JOBS}"
-
 mkdir -p "$LOG_DIR"
 export PATH="$TOOLS_DIR/bin:$PATH"
 
-# ── Idempotency ───────────────────────────────────────────────────────────────
+BMAKE_FLAGS="-j${MAKE_JOBS}"
+KERNEL_BIN="$OS161_DIR/root/kernel"
+
+# Pre-condition
+[ -f "$OS161_DIR/root/sys161.conf" ] \
+    || die "Root directory not configured — run setupRoot.sh first"
+
+# ── Build DUMBVM kernel (idempotent: skip if already present) ─────────────────
 if [ -f "$KERNEL_BIN" ]; then
-    log_ok "Test kernel already built ($KERNEL_BIN) — skipping build"
+    log_ok "DUMBVM kernel already built ($KERNEL_BIN) — skipping build"
     log_info "Re-running sys161 boot test..."
 else
-    log_info "Test build directory: $TESTBUILD_DIR"
-    log_info "Logs: $LOG_DIR/testBuild-*.log"
-
-    _setup_src() {
-        rm -rf "$TESTBUILD_DIR"
-        mkdir -p "$TEST_OSTREE"
-        tar -xf "$(find_tarball 'os161-base-*.tar.gz')" -C "$TESTBUILD_DIR"
-        mv "$TESTBUILD_DIR"/os161-base-* "$TEST_SRC_DIR"
-        cp "$SCRIPT_DIR/fixedFiles/usemtest.c" \
-            "$TEST_SRC_DIR/userland/testbin/usemtest/usemtest.c"
-        cd "$TEST_SRC_DIR"
-        ./configure --ostree="$TEST_OSTREE"
-        bmake $BMAKE_FLAGS
-        bmake $BMAKE_FLAGS install
-    }
-    run_step "test: configure + userland" "$LOG_DIR/testBuild-userland.log" _setup_src
-
     _build_kernel() {
-        cd "$TEST_SRC_DIR/kern/conf"
+        cd "$OS161_DIR/src/kern/conf"
         ./config DUMBVM
         cd ../compile/DUMBVM
         bmake $BMAKE_FLAGS depend
         bmake $BMAKE_FLAGS
         bmake $BMAKE_FLAGS install
     }
-    run_step "test: DUMBVM kernel" "$LOG_DIR/testBuild-kernel.log" _build_kernel
-
-    cp "$TOOLS_DIR/share/examples/sys161/sys161.conf.sample" "$TEST_OSTREE/sys161.conf"
-
-    _create_disks() {
-        cd "$TEST_OSTREE"
-        disk161 create LHD0.img 5M
-        disk161 create LHD1.img 5M
-    }
-    run_step "test: create disks" "$LOG_DIR/testBuild-disks.log" _create_disks
+    run_step "DUMBVM kernel" "$LOG_DIR/testBuild-kernel.log" _build_kernel
 fi
 
-# Boot test — always run even if build was skipped, so a re-run re-verifies.
+# ── Boot test ─────────────────────────────────────────────────────────────────
 log_info "Booting DUMBVM kernel with sys161 (should start and shut down cleanly)..."
-cd "$TEST_OSTREE"
+cd "$OS161_DIR/root"
 sys161 kernel 's;q'
 log_ok "sys161 boot test passed."
 
