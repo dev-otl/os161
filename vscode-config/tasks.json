@@ -42,6 +42,16 @@
             "type": "shell",
             "command": "cd root;sys161 kernel",
             "problemMatcher": []
+        },
+        {
+            "label": "Build, Install and Run OS161 (no debug)",
+            "type": "shell",
+            "command": "cd src/kern/conf/ && ./config ${input:VersionName} && cd ../compile/${input:VersionName} && bmake depend && bmake && bmake install && cd ../../../../root && sys161 kernel",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ],
     "inputs": [
